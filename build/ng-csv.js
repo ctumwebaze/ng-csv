@@ -36,125 +36,133 @@ if (typeof module !== 'undefined' && typeof exports !== 'undefined' && module.ex
  * Created by asafdav on 15/05/14.
  */
 angular.module('ngCsv.services').
-  service('CSV', ['$q', function ($q) {
+service('CSV', ['$q', function($q) {
 
-    var EOL = '\r\n';
-    var BOM = "\ufeff";
+  var EOL = '\r\n';
+  var BOM = "\ufeff";
 
-    var specialChars = {
-      '\\t': '\t',
-      '\\b': '\b',
-      '\\v': '\v',
-      '\\f': '\f',
-      '\\r': '\r'
-    };
+  var specialChars = {
+    '\\t': '\t',
+    '\\b': '\b',
+    '\\v': '\v',
+    '\\f': '\f',
+    '\\r': '\r'
+  };
 
-    /**
-     * Stringify one field
-     * @param data
-     * @param options
-     * @returns {*}
-     */
-    this.stringifyField = function (data, options) {
-      if (options.decimalSep === 'locale' && this.isFloat(data)) {
-        return data.toLocaleString();
-      }
+  /**
+   * Stringify one field
+   * @param data
+   * @param options
+   * @returns {*}
+   */
+  this.stringifyField = function(data, options) {
+    if (options.decimalSep === 'locale' && this.isFloat(data)) {
+      return data.toLocaleString();
+    }
 
-      if (options.decimalSep !== '.' && this.isFloat(data)) {
-        return data.toString().replace('.', options.decimalSep);
-      }
+    if (options.decimalSep !== '.' && this.isFloat(data)) {
+      return data.toString().replace('.', options.decimalSep);
+    }
 
-      if (typeof data === 'string') {
-        data = data.replace(/"/g, '""'); // Escape double qoutes
+    if (typeof data === 'string') {
+      data = data.replace(/"/g, '""'); // Escape double qoutes
 
-        if (options.quoteStrings || data.indexOf(',') > -1 || data.indexOf('\n') > -1 || data.indexOf('\r') > -1) {
-            data = options.txtDelim + data + options.txtDelim;
-        }
-
-        return data;
-      }
-
-      if (typeof data === 'boolean') {
-        return data ? 'TRUE' : 'FALSE';
+      if (options.quoteStrings || data.indexOf(',') > -1 || data.indexOf('\n') > -1 || data.indexOf('\r') > -1) {
+        data = options.txtDelim + data + options.txtDelim;
       }
 
       return data;
-    };
+    }
 
-    /**
-     * Helper function to check if input is float
-     * @param input
-     * @returns {boolean}
-     */
-    this.isFloat = function (input) {
-      return +input === input && (!isFinite(input) || Boolean(input % 1));
-    };
+    if (typeof data === 'boolean') {
+      return data ? 'TRUE' : 'FALSE';
+    }
 
-    /**
-     * Creates a csv from a data array
-     * @param data
-     * @param options
-     *  * header - Provide the first row (optional)
-     *  * fieldSep - Field separator, default: ',',
-     *  * addByteOrderMarker - Add Byte order mark, default(false)
-     * @param callback
-     */
-    this.stringify = function (data, options) {
-      var def = $q.defer();
+    return data;
+  };
 
-      var that = this;
-      var csv = "";
-      var csvContent = "";
+  /**
+   * Helper function to check if input is float
+   * @param input
+   * @returns {boolean}
+   */
+  this.isFloat = function(input) {
+    return +input === input && (!isFinite(input) || Boolean(input % 1));
+  };
 
-      var dataPromise = $q.when(data).then(function (responseData) {
-        //responseData = angular.copy(responseData);//moved to row creation
-        // Check if there's a provided header array
-        if (angular.isDefined(options.header) && options.header) {
+  /**
+   * Creates a csv from a data array
+   * @param data
+   * @param options
+   *  * header - Provide the first row (optional)
+   *  * fieldSep - Field separator, default: ',',
+   *  * addByteOrderMarker - Add Byte order mark, default(false)
+   * @param callback
+   */
+  this.stringify = function(data, options) {
+    var def = $q.defer();
+
+    var that = this;
+    var csv = '';
+    var csvContent = '';
+
+    var promises = [];
+    if (angular.isDefined(options.header) && options.header) {
+      promises.push($q.when(options.header));
+    }
+
+    $q
+      .when((angular.isDefined(options.header) && options.header) ? options.header : null)
+      .then(function(header) {
+        if (header) {
           var encodingArray, headerString;
 
           encodingArray = [];
-          angular.forEach(options.header, function (title, key) {
+          angular.forEach(options.header, function(title) {
             this.push(that.stringifyField(title, options));
           }, encodingArray);
 
-          headerString = encodingArray.join(options.fieldSep ? options.fieldSep : ",");
+          headerString = encodingArray.join(options.fieldSep ? options.fieldSep : ',');
           csvContent += headerString + EOL;
         }
+
+        return $q.when(data);
+      })
+      .then(function(responseData) {
 
         var arrData = [];
 
         if (angular.isArray(responseData)) {
           arrData = responseData;
-        }
-        else if (angular.isFunction(responseData)) {
+        } else if (angular.isFunction(responseData)) {
           arrData = responseData();
         }
 
         // Check if using keys as labels
         if (angular.isDefined(options.label) && options.label && typeof options.label === 'boolean') {
-            var labelArray, labelString;
+          var labelArray, labelString;
 
-            labelArray = [];
-            angular.forEach(arrData[0], function(value, label) {
-                this.push(that.stringifyField(label, options));
-            }, labelArray);
-            labelString = labelArray.join(options.fieldSep ? options.fieldSep : ",");
-            csvContent += labelString + EOL;
+          labelArray = [];
+          angular.forEach(arrData[0], function(value, label) {
+            this.push(that.stringifyField(label, options));
+          }, labelArray);
+          labelString = labelArray.join(options.fieldSep ? options.fieldSep : ',');
+          csvContent += labelString + EOL;
         }
 
-        angular.forEach(arrData, function (oldRow, index) {
+        angular.forEach(arrData, function(oldRow, index) {
           var row = angular.copy(arrData[index]);
           var dataString, infoArray;
 
           infoArray = [];
 
           var iterator = !!options.columnOrder ? options.columnOrder : row;
-          angular.forEach(iterator, function (field, key) {
+          angular.forEach(iterator, function(field) {
             var val = !!options.columnOrder ? row[field] : field;
             this.push(that.stringifyField(val, options));
           }, infoArray);
 
-          dataString = infoArray.join(options.fieldSep ? options.fieldSep : ",");
+          dataString = infoArray.join(options.fieldSep ? options.fieldSep : ',');
           csvContent += index < arrData.length ? dataString + EOL : dataString;
         });
 
@@ -166,38 +174,33 @@ angular.module('ngCsv.services').
         // Append the content and resolve.
         csv += csvContent;
         def.resolve(csv);
+
+      }, function(err) {
+        def.reject(err);
       });
 
-      if (typeof dataPromise['catch'] === 'function') {
-        dataPromise['catch'](function (err) {
-          def.reject(err);
-        });
-      }
+    return def.promise;
+  };
 
-      return def.promise;
-    };
+  /**
+   * Helper function to check if input is really a special character
+   * @param input
+   * @returns {boolean}
+   */
+  this.isSpecialChar = function(input) {
+    return specialChars[input] !== undefined;
+  };
 
-    /**
-     * Helper function to check if input is really a special character
-     * @param input
-     * @returns {boolean}
-     */
-    this.isSpecialChar = function(input){
-      return specialChars[input] !== undefined;
-    };
-
-    /**
-     * Helper function to get what the special character was supposed to be
-     * since Angular escapes the first backslash
-     * @param input
-     * @returns {special character string}
-     */
-    this.getSpecialChar = function (input) {
-      return specialChars[input];
-    };
-
-
-  }]);
+  /**
+   * Helper function to get what the special character was supposed to be
+   * since Angular escapes the first backslash
+   * @param input
+   * @returns {special character string}
+   */
+  this.getSpecialChar = function(input) {
+    return specialChars[input];
+  };
+}]);
 /**
  * ng-csv module
  * Export Javascript's arrays to csv files from the browser
