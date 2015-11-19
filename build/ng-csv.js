@@ -118,7 +118,7 @@ service('CSV', ['$q', function($q) {
           var encodingArray, headerString;
 
           encodingArray = [];
-          angular.forEach(options.header, function(title) {
+          angular.forEach(header, function(title) {
             this.push(that.stringifyField(title, options));
           }, encodingArray);
 
@@ -129,7 +129,6 @@ service('CSV', ['$q', function($q) {
         return $q.when(data);
       })
       .then(function(responseData) {
-
         var arrData = [];
 
         if (angular.isArray(responseData)) {
